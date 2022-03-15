@@ -1,0 +1,107 @@
+Spring笔记
+1.bean销毁
+2. spring容器的doClose(),和注册钩子方法，   context.close()
+3. 
+
+销毁的方法：实现一个接口、@PreDestroy
+spring校验类自己有没有写 close（）或者shutdown（）
+
+销毁bean的BeanPostProcessor ，讲了个例子，initDestroyAnn.....
+
+spring容器关闭是如何触发调用销毁Bean的逻辑的
+
+
+
+populateBean()
+
+@Autowired注解的BeanPostProcessor  ，不会给静态属性赋值，因为静态属性是属于class的，如果你定义的Bean是“prototype”，那么相当于每次getBean()都会重新给静态属性赋值，会一直被替换（如果你这个静态属性也是个原型对象就会一直变）
+
+通过BeanDefinition直接给属性设置值的话必须有对应值的set方法，否则会报错，方法上不用加@Autowired注解
+
+
+
+20210923
+
+回顾注入点
+
+metaData.inject() 讲解具体的注入过程
+@Autowired 给method 注入属性步骤
+method注入时 获取方法的名字和类型 比较有困难 方法：DefaultParameterNameDiscoverer()
+
+Enviment 包括：配置文件，-D参数，运行时配置，
+
+
+
+20220207
+	spring应用启动步骤分解（AnnotationConfigApplicationContext）
+	this():
+		初始化reader，将一些基础的后置处理器注册到Registry，例如：ConfigurationClassPostProcessor（解析配置类），AutowiredAnnotationBeanPostProcessor（解析@Autowired注解），CommonAnnotationPostProcessor（解析@Resource注解）
+		初始化Scanner
+	
+	register(XX.class):
+		注册自定义的class到Registry（一般会传入配置类）
+	
+	refresh():
+
+
+20220208
+	什时候触发的扫描包路径？
+
+
+Spring 启动流程
+	1.父类构造方法实例化BeanFactory
+	2.初始化reader并注册一下基础组件例如：ConfigurationClassPostProcessor，AutowiredAnnotationBeanPostProcessor，CommonAnnotationBeanPostProcessor..
+	3.初始化scanner，注册一个默认的过滤器 扫描@Component注解的bean
+	4.注册自定义传入的配置类
+	5.refresh()方法
+	6.设置启动时间，验证环境参数，配置上下文回调，注册BeanPostProcessor等初始化准备
+	7.调用Bean工厂处理器，BeanDefinitionRegistryPostProcessor，BeanFactoryPostProcessor在Bean公共场中的实现类。调用到初始化reader时注册的ConfigurationClassPostProcessor，解析配置类。@ComponentScan，@Import...
+	8.将BeanFactory中现有的Bean的后置处理器，注册到一个集合中用于后续调用（其中对后置处理器进行了一些排序操作PriorityOrdered,Order接口，无接口，内部处理器的区分等...）。
+	9.国际化支持
+	10.初始化时间发布器并注册监听器，
+	11.实例化Bean工厂中非懒加载的单例bean
+	12.初始化一个容器声明周期处理器，并调用处理器的onRefresh()方法
+	13.发布一个容器初始化完成事件
+
+创建Bean过程：
+	1.遍历BeanFactory中所有的BeanDefinitionNames
+	2.首先合并BeanDefinition
+	3.非抽象 && 单例 && 非懒加载 执行getBean()
+		FactoryBean执行支线：
+		i1.如果是FactoryBean 则使用”&“ +BeanName 调用getBean();
+		i2.判断是否需要较早的初始化，是的话则通过BeanName 调用getBean()（通过getObject()创建对象）
+	4.getBean()
+		1.转换BeanName，将别名转换成规范名称，如果加了FactoryBean前缀则先去除。
+		2.getSingleton() 用于处理循环依赖，看代码去
+		3....省略一下步骤
+		4.合并BeanDefinition
+		5.判断当前Bean是否加了@DependsOn注解，有的话则先去注册依赖关系，销毁bean的时候用，再实例化依赖的bean
+		6.正常接着走createBean()方法
+createBean()
+	1.拿到Bean的class对象，clone一下BeanDefinition 设置BeanClass，后续使用
+	2.Bean实例化前时机，相应的后置处理器可在此处对bean进行处理。
+	3.如果初始化前后置处理器调用后返回对象不为空，说明bean就用此对象，不再走接下来的创建流程。紧接着再调用初始化后时机的处理，然后就返回对象。
+	4.推断构造方法 创建bean的实例（此时未进行属性注入）。
+	5.合并BeanDefinition的后置处理时机，此时处理@Autowired注解的处理器会去查找注入点。加了@Autowired、@Value、@Inject注解会被扫描到
+	6.向三级缓存singletonFactories注册一个singletonFactory类型的lambda表达式，用于处理循环依赖。
+		调用到singletonFactory.getObject()时，会调用到后置处理器的getEarlyBeanReference() 会返回bean的早期引用对象，如果被代理了则返回代理对象。
+	7.实例化后实际调用后置处理器。
+	8.检查bean的注入模型byType或byName，是的话拿到相应的属性后先放入pvs。
+	9.调用后置处理器的postProcessProperties()，@Autowired，在此处注入，因为前面已经拿到注入点了。在这执行就好了（正儿八经将值注入字段，这里的值没有放到pvs中）
+	10.对pvs中的值进行赋值。
+initializeBean()
+	1.对Aware方法进行回调
+	2.调用初始化方法afterPropertiesSet()
+	3.初始化后时机，AOP！
+
+
+InfrastructureAdvisorAutoProxyCreator
+AnnotationAwareAspectJAutoProxyCreator
+
+
+
+
+
+
+
+
